@@ -155,14 +155,14 @@ export function decodeArchive(raw: unknown): Archive {
   };
 }
 
-export function filterArchive(archive: Archive, filters: ViewFilters): Month[] {
+export function filterArchive(archive: Archive, filters: ViewFilters, noteOf: (note: string) => string = (note) => note): Month[] {
   const tokens = norm(filters.query).split(" ").filter(Boolean);
   const months: Month[] = [];
   for (const month of archive.months) {
     if (filters.year !== "all" && !month.ym.startsWith(`${filters.year}-`)) continue;
     const entries: Entry[] = [];
     for (const entry of month.entries) {
-      const name = norm(`${entry.name} ${entry.note}`);
+      const name = norm(`${entry.name} ${entry.note} ${noteOf(entry.note)}`);
       if (tokens.length && !tokens.every((token) => name.includes(token))) continue;
       const offers = entry.offers.filter((offer) => {
         if (filters.region !== "all" && offer.region !== filters.region) return false;
