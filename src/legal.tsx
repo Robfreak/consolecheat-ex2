@@ -137,7 +137,7 @@ function Datenschutz() {
         </p>
         <h2 className="mt-2 font-display text-2xl font-semibold tracking-tight text-fg">Monatsliste</h2>
         <p>
-          Die Monatsspiele stammen aus den öffentlichen Listen des PlayStation Wiki (CC BY-SA). Jede Zeile behält die
+          Die Monatsspiele stammen aus den öffentlichen Listen des PlayStation Wikis (CC BY-SA). Jede Zeile behält die
           Quellenangabe der Wiki-Tabelle. Die Datei wird beim Bauen erzeugt. Der Browser lädt sie von dieser Website,
           nicht von einem separaten Dienst.
         </p>

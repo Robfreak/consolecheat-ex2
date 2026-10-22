@@ -323,7 +323,7 @@ export function App() {
                   </h3>
                   <ul className="mt-3 flex flex-col gap-3">
                     {month.entries.map((entry) => (
-                      <GameCard key={`${month.ym}:${entry.name}`} name={entry.name} offers={entry.offers} t={t} lang={lang} />
+                      <GameCard key={`${month.ym}:${entry.name}:${entry.note}`} name={entry.name} note={entry.note} offers={entry.offers} t={t} lang={lang} />
                     ))}
                   </ul>
                 </section>
@@ -359,22 +359,17 @@ export function App() {
           <p>{t.freeClaim}</p>
           <p>{t.privacyClaim}</p>
           <p>{t.footerNote}</p>
-          {archive ? (
-            <p>
-              <a href={archive.list} className="text-steel underline-offset-4 hover:underline">
-                PlayStation Wiki (Fandom)
-              </a>
-              {", Autoren · "}
-              <a
-                href="https://creativecommons.org/licenses/by-sa/4.0/"
-                className="text-steel underline-offset-4 hover:underline"
-              >
-                {archive.license || "CC BY-SA 4.0"}
-              </a>
-              {" · bearbeitet"}
-              {archive.generated ? ` · ${archive.generated}` : ""}
-            </p>
-          ) : null}
+          <p>
+            {"Daten aus dem "}
+            <a href="https://playstation.fandom.com/wiki/PlayStation_Plus" className="text-steel underline-offset-4 hover:underline">
+              PlayStation Wiki (Fandom)
+            </a>
+            {", "}
+            <a href="https://creativecommons.org/licenses/by-sa/4.0/" className="text-steel underline-offset-4 hover:underline">
+              CC BY-SA 4.0
+            </a>
+            {", bearbeitet"}
+          </p>
         </div>
       </footer>
     </div>
@@ -409,15 +404,18 @@ function Coverage({ archive, t, lang }: { archive: Archive; t: Copy; lang: Lang 
   );
 }
 
-function GameCard({ name, offers, t, lang }: { name: string; offers: Offer[]; t: Copy; lang: Lang }) {
+function GameCard({ name, note, offers, t, lang }: { name: string; note: string; offers: Offer[]; t: Copy; lang: Lang }) {
   const ids = visibleIds(offers);
   const open = finderHref(ids.length === 1 ? ids[0] : name);
   return (
     <li className="panel rounded-xl p-4 sm:p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <a href={open} className="font-display text-xl font-semibold tracking-tight text-fg">
-          {name}
-        </a>
+        <div className="min-w-0">
+          <a href={open} className="font-display text-xl font-semibold tracking-tight text-fg">
+            {name}
+          </a>
+          {note ? <p className="mt-0.5 text-sm text-subtle">{note}</p> : null}
+        </div>
         <a
           href={open}
           className="inline-flex h-11 items-center rounded-lg border border-accent bg-accent px-4 text-sm font-medium text-accent-fg"

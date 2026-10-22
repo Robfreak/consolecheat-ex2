@@ -70,4 +70,26 @@ test("filters and the Title-ID-Finder link use q, not id", () => {
   const octoberNames = archive.months.find((month) => month.ym === "2026-10")?.entries.map((entry) => entry.name) ?? [];
   assert.equal(octoberNames.filter((name) => name.includes("F1 25")).length, 1);
   assert.deepEqual(visibleIds([{ region: "US", platforms: ["PS4"], added: "", removed: "", ref: "", page: "https://example.com", ids: ["CUSA1", "CUSA1"] }]).length, 1);
+
+  const february = archive.months.find((month) => month.ym === "2021-02");
+  const biped = february?.entries.find((entry) => entry.name === "Biped");
+  const shio = february?.entries.find((entry) => entry.name === "Shio");
+  assert.equal(biped?.note, "Taiwan");
+  assert.equal(shio?.note, "Hong Kong");
+  assert.ok(biped?.offers.some((offer) => offer.region === "Asia" && offer.platforms.includes("PS4")));
+  assert.ok(shio?.offers.some((offer) => offer.region === "Asia" && offer.platforms.includes("PS4")));
+  assert.equal(february?.entries.some((entry) => entry.name.includes("(")), false);
+
+  const beyond = archive.months.find((month) => month.ym === "2019-07")?.entries.find((entry) => entry.name === "Beyond: Two Souls");
+  assert.equal(beyond?.note, "Middle East");
+  const destiny = archive.months.find((month) => month.ym === "2023-02")?.entries.find((entry) => entry.name.includes("Beyond Light"));
+  assert.equal(destiny?.name, "Destiny 2: Beyond Light");
+  assert.equal(destiny?.note, "DLC only");
+  for (const month of archive.months) {
+    for (const entry of month.entries) {
+      assert.equal(/\((?:Middle East|DLC only|Spain and Portugal|Singapore and Thailand Only|Kuwait)\)/.test(entry.name), false);
+    }
+  }
+  const hongKong = filterArchive(archive, { query: "hong kong", region: "Asia", platform: "PS4", year: "2021" });
+  assert.ok(hongKong.some((month) => month.ym === "2021-02" && month.entries.some((entry) => entry.name === "Shio" && entry.note === "Hong Kong")));
 });
