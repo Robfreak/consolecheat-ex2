@@ -46,6 +46,9 @@ test("result counts use the singular where the language has one", () => {
   assert.equal(resultCount("ja", 1), "1 本");
   assert.equal(resultCount("tr", 1), "1 oyun");
   assert.equal(resultCount("tr", 2), "2 oyun");
+  assert.equal(resultCount("pt", 0), "0 jogos");
+  assert.equal(resultCount("pt", 1), "1 jogo");
+  assert.equal(resultCount("pt", 2), "2 jogos");
   assert.notEqual(resultCount("en", 1), resultCount("en", 2));
 });
 
@@ -60,6 +63,8 @@ test("notes follow the UI language and unknown notes stay as stored", () => {
   assert.equal(noteLabel("fr", "DLC only"), "DLC uniquement");
   assert.equal(noteLabel("ja", "Hong Kong"), "香港");
   assert.equal(noteLabel("en", "Taiwan"), "Taiwan");
+  assert.equal(noteLabel("en", "Singapore and Thailand Only"), "Singapore and Thailand only");
+  assert.equal(noteLabel("en", "DLC only"), "DLC only");
   assert.equal(noteLabel("de", "A note the table does not know"), "A note the table does not know");
   assert.equal(noteLabel("de", ""), "");
   for (const { id } of languageOptions) {

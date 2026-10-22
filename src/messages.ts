@@ -1442,6 +1442,8 @@ export function sourceLineText(template: string): string {
 
 function pluralLocale(lang: Lang): string {
   if (lang === "no") return "nb";
+  // Bare "pt" follows Brazilian rules, where 0 is singular ("0 jogo").
+  if (lang === "pt") return "pt-PT";
   return lang;
 }
 

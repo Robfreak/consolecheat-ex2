@@ -143,7 +143,7 @@ const noteTranslations: Record<string, Partial<Record<Lang, string>>> = {
   },
   "Singapore and Thailand Only": {
     de: "nur Singapur und Thailand",
-    en: "Singapore and Thailand Only",
+    en: "Singapore and Thailand only",
     fr: "Singapour et Thaïlande uniquement",
     es: "solo Singapur y Tailandia",
     pt: "apenas Singapura e Tailândia",
