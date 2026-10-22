@@ -10,7 +10,8 @@
  * Title-ID-Finder dataset (exact normalized name or alias). No fuzzy match.
  *
  * Compact months tuple, newest first:
- *   [name, offers]
+ *   [name, note, offers]
+ *   note: a regional or availability suffix such as "Middle East" or "DLC only", or ""
  *   offer = [region, platforms, added, removed, refUrlIndex, pageUrlIndex, ids]
  *   region: U | E | J | A
  *   platforms: "4" | "5" | "45"
@@ -365,6 +366,62 @@ function cleanName(name) {
     .trim();
 }
 
+/** Region and availability suffixes. A year in parentheses is a different release, not one of these. */
+function isAvailabilityNote(value) {
+  const text = String(value).replace(/\s+/g, " ").trim();
+  if (!text || /^(?:19|20)\d{2}$/.test(text)) return false;
+  if (/^[A-Z]{2,3}(?:\s*,\s*[A-Z]{2,3})*$/.test(text)) return false;
+  return /^(?:DLC only|Middle East(?: and India)?|Kuwait|Spain and Portugal|Singapore and Thailand Only|Taiwan|Hong Kong)$/i.test(text);
+}
+
+/** Pull a trailing "(Middle East)" or "(DLC only)" off the visible title. */
+export function peelNote(name) {
+  const text = String(name).replace(/\s+/g, " ").trim();
+  const match = text.match(/^(.*?)[（(]\s*([^）)]+?)\s*[）)]$/);
+  if (!match) return { name: text, note: "" };
+  const note = match[2].replace(/\s+/g, " ").trim();
+  if (!isAvailabilityNote(note)) return { name: text, note: "" };
+  return { name: match[1].replace(/\s+/g, " ").trim(), note };
+}
+
+/**
+ * Asia February 2021 writes two games in one cell:
+ * [[Biped]]（Taiwan）[[Shio]]（Hong Kong）
+ * Fullwidth parentheses, no separator. Each link plus its note becomes its own row.
+ */
+export function splitGluedTitles(raw) {
+  const text = String(raw);
+  const re = /\[\[([^\]|#]+)(?:#[^\]|]*)?(?:\|([^\]]+))?\]\]\s*[（(]\s*([^）)]+?)\s*[）)]/g;
+  const parts = [];
+  let cursor = 0;
+  for (const match of text.matchAll(re)) {
+    const gap = text.slice(cursor, match.index);
+    if (parts.length && gap.replace(/[\s'"]/g, "")) return null;
+    const label = (match[2] || match[1]).replace(/_/g, " ").trim();
+    const plain = label.replace(/\s+\((?:video game|series|franchise)\)$/i, "").trim();
+    const note = match[3].replace(/\s+/g, " ").trim();
+    if (!plain || !isAvailabilityNote(note)) return null;
+    parts.push({ name: plain, note });
+    cursor = match.index + match[0].length;
+  }
+  if (parts.length < 2) return null;
+  if (text.slice(cursor).replace(/[\s'"]/g, "")) return null;
+  return parts;
+}
+
+function titledPieces(rawName) {
+  const glued = splitGluedTitles(rawName);
+  if (glued) return glued.map((part) => ({ name: cleanName(part.name), note: part.note, alts: [] }));
+  const alts = linkTargets(rawName);
+  const peeled = peelNote(chooseName(cleanName(stripMarkup(rawName)), alts));
+  const altNames = [];
+  for (const alt of alts) {
+    const cleaned = peelNote(cleanName(alt)).name;
+    if (bareKey(cleaned) && bareKey(cleaned) !== bareKey(peeled.name)) altNames.push(cleaned);
+  }
+  return [{ name: peeled.name, note: peeled.note, alts: altNames }];
+}
+
 function chooseName(name, alts) {
   const core = (value) => value.replace(/\([^)]*\)/g, "").replace(/[^\p{L}\p{N}]+/gu, "").trim();
   if (core(name).length >= 2) return name;
@@ -462,19 +519,16 @@ export function parseSoftwareTable(wikitext) {
   const rows = [];
   for (const cells of dataRows) {
     const rawName = cells[gameCol] ?? "";
-    const alts = linkTargets(rawName);
-    const name = chooseName(cleanName(stripMarkup(rawName)), alts);
-    if (!name || /^\d+$/.test(name)) continue;
-    rows.push({
-      name,
-      alts: alts.map((alt) => cleanName(alt)).filter((alt) => bareKey(alt) && bareKey(alt) !== bareKey(name)),
-      ps4: ps4Col >= 0 && isYes(cells[ps4Col] ?? ""),
-      ps5: ps5Col >= 0 && isYes(cells[ps5Col] ?? ""),
-      vr: vrCol >= 0 && isYes(cells[vrCol] ?? ""),
-      added: addedCol >= 0 ? parseDate(cells[addedCol] ?? "") : null,
-      removed: removedCol >= 0 ? parseDate(cells[removedCol] ?? "") : null,
-      ref: refCol >= 0 ? refUrl(cells[refCol] ?? "", names) : "",
-    });
+    const ps4 = ps4Col >= 0 && isYes(cells[ps4Col] ?? "");
+    const ps5 = ps5Col >= 0 && isYes(cells[ps5Col] ?? "");
+    const vr = vrCol >= 0 && isYes(cells[vrCol] ?? "");
+    const added = addedCol >= 0 ? parseDate(cells[addedCol] ?? "") : null;
+    const removed = removedCol >= 0 ? parseDate(cells[removedCol] ?? "") : null;
+    const ref = refCol >= 0 ? refUrl(cells[refCol] ?? "", names) : "";
+    for (const piece of titledPieces(rawName)) {
+      if (!piece.name || /^\d+$/.test(piece.name)) continue;
+      rows.push({ name: piece.name, note: piece.note, alts: piece.alts, ps4, ps5, vr, added, removed, ref });
+    }
   }
   return rows;
 }
@@ -687,8 +741,9 @@ function idsFor(game, region, platforms) {
 }
 
 function lookupName(index, name) {
-  const strict = bareKey(name);
-  const loose = matchKey(name);
+  const peeled = peelNote(name).name;
+  const strict = bareKey(peeled);
+  const loose = matchKey(peeled);
   const keys = [];
   if (strict) keys.push(strict);
   if (loose && loose !== strict) keys.push(loose);
@@ -788,6 +843,7 @@ async function main() {
         continue;
       }
       const display = canonicalName(row.name);
+      const note = row.note ?? "";
       const ym = monthKey(row.added);
       if (!display || !ym) {
         omitted.noDate += 1;
@@ -805,10 +861,10 @@ async function main() {
         month = new Map();
         byMonth.set(ym, month);
       }
-      const key = matchKey(display);
+      const key = `${matchKey(display)}\0${note.toLowerCase()}`;
       let entry = month.get(key);
       if (!entry) {
-        entry = { name: display, raws: new Set([row.name]), legacy: legacyKey(row.name), alts: new Set(row.alts), offers: [] };
+        entry = { name: display, note, raws: new Set([row.name]), legacy: legacyKey(row.name), alts: new Set(row.alts), offers: [] };
         month.set(key, entry);
       } else {
         const incoming = legacyKey(row.name);
@@ -908,6 +964,7 @@ async function main() {
       ym,
       games.map((entry) => [
         entry.name,
+        entry.note,
         entry.offers
           .sort((a, b) => a.region.localeCompare(b.region))
           .map((offer) => [
@@ -955,8 +1012,9 @@ async function main() {
   const readable = {
     months: archive.m.map(([ym, games]) => ({
       ym,
-      entries: games.map(([name, offers]) => ({
+      entries: games.map(([name, note, offers]) => ({
         name,
+        note,
         offers: offers.map(([region, platforms, added, removed, ref, page, ids]) => ({
           region,
           platforms,
@@ -1000,6 +1058,26 @@ async function main() {
   const gowUs = gow?.offers.find((offer) => offer.region === "U");
   if (!gowUs?.ids.includes("CUSA07408")) {
     throw new Error(`God of War (2018) US should match CUSA07408, got ${gowUs?.ids.join(",") || "none"}.`);
+  }
+  const february = readable.months.find((month) => month.ym === "2021-02");
+  const biped = february?.entries.find((entry) => entry.name === "Biped");
+  const shio = february?.entries.find((entry) => entry.name === "Shio");
+  if (biped?.note !== "Taiwan" || !biped.offers.some((offer) => offer.region === "A")) {
+    throw new Error(`Asia February 2021 should list Biped with note Taiwan, got ${biped?.note ?? "missing"}.`);
+  }
+  if (shio?.note !== "Hong Kong" || !shio.offers.some((offer) => offer.region === "A")) {
+    throw new Error(`Asia February 2021 should list Shio with note Hong Kong, got ${shio?.note ?? "missing"}.`);
+  }
+  const beyond = readable.months.find((month) => month.ym === "2019-07")?.entries.find((entry) => entry.name === "Beyond: Two Souls");
+  if (beyond?.note !== "Middle East") {
+    throw new Error(`Beyond: Two Souls should keep the Middle East note, got ${beyond?.note ?? "missing"}.`);
+  }
+  for (const month of readable.months) {
+    for (const entry of month.entries) {
+      if (/\((?:Middle East|DLC only|Spain and Portugal|Singapore and Thailand Only|Kuwait|Taiwan|Hong Kong)\)/.test(entry.name)) {
+        throw new Error(`Availability note still in the title: ${entry.name}`);
+      }
+    }
   }
 
   archive.stats.urls = urls.length;

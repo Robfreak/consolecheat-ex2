@@ -25,7 +25,7 @@ Pages the script asks for:
 
 A year page from 2014 through the current year must exist and must contain at least one PS4 or PS5 row, or the script stops. It does not invent a month to fill a hole.
 
-Title IDs come from the Title-ID-Finder file `public/titles.json` at commit `d8264e5adf8e3806c6868623ca5a6aa1829d28a1` of `cursor/title-id-finder-0ef2` (compact format 2). That file is built from andshrew/PlayStation-Titles. Before the comparison the script strips ™/®, a leading “EA Sports”, a trailing `(year)`, and the typo Challanger → Challenger. A name matches only when that key is exactly one game. If the dataset has several releases of that name (the base title and a remaster, campaign, or other edition, or two records with the same name), the row gets no ID. The ID’s region and platform still have to be the ones on the monthly row. Unknown-region IDs are not copied.
+Title IDs come from the Title-ID-Finder file `public/titles.json` at commit `d8264e5adf8e3806c6868623ca5a6aa1829d28a1` of `cursor/title-id-finder-0ef2` (compact format 2). That file is built from andshrew/PlayStation-Titles. Before the comparison the script strips ™/®, a leading “EA Sports”, a trailing `(year)`, an availability suffix such as `(Middle East)` or `(DLC only)`, and the typo Challanger → Challenger. The suffix is kept as the entry’s `note` and shown under the title. A name matches only when that cleaned key is exactly one game. If the dataset has several releases of that name (the base title and a remaster, campaign, or other edition, or two records with the same name), the row gets no ID. The ID’s region and platform still have to be the ones on the monthly row. Unknown-region IDs are not copied.
 
 A removal date that falls before the add date is moved forward one year when that lands within 45 days, which is the December-to-January typo (December 2025 North America was “January 5, 2025” on the wiki). Every correction is printed by the script. Longer spans the wiki actually printed, including the June 2026 PAL rows, are left as they are.
 
@@ -69,13 +69,13 @@ Not in the source, so not in the archive:
 - PAL has no PS4/PS5 row for December 2013 or May 2014.
 - PAL July 2026 is empty as a month because the wiki dates Call of Duty: Modern Warfare III, For the King II, and CrossCode to 2 June 2026 (removed 3 August 2026). The citation on those rows is the July announcement (`…de-julio-…`). The archive keeps the date printed in the table.
 
-A regional note such as “(Spain and Portugal)” is part of the wiki row and stays on the name. It is not a separate region filter.
+A regional or availability suffix such as “(Spain and Portugal)”, “(Middle East)”, or “(DLC only)” is stored in `note` and shown under the title. It is not a separate region filter. Asia’s February 2021 cell `[[Biped]]（Taiwan）[[Shio]]（Hong Kong）` is two games: Biped (Taiwan) and Shio (Hong Kong).
 
 ## Footer
 
 The footer matches the Title-ID-Finder at `d8264e5`: the name, then Impressum and Datenschutz, the free line, the privacy line, and the “not Sony” line. Those two links are `#impressum` and `#datenschutz` on this site, the same hash pages that project uses. The Impressum is the same placeholder text. No name, address, or contact is filled in. The privacy page describes this archive (static files, no cookies, self-hosted fonts, the wiki list) and points at the same GitHub privacy statement.
 
-The source line is the CC BY-SA attribution: “PlayStation Wiki (Fandom), Autoren”, a link to the [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/) license, and “bearbeitet”.
+The source line is “Daten aus dem PlayStation Wiki (Fandom), CC BY-SA 4.0, bearbeitet”, with [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/) linked. Fonts are the fontsource files with the `.woff` fallback removed, same as the Title-ID-Finder, so the build ships only `.woff2`.
 
 ## GitHub Pages
 

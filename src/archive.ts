@@ -15,6 +15,7 @@ export type Offer = {
 
 export type Entry = {
   name: string;
+  note: string;
   offers: Offer[];
 };
 
@@ -94,8 +95,12 @@ export function decodeArchive(raw: unknown): Archive {
   const months: Month[] = data.m.map((month) => {
     if (!Array.isArray(month) || typeof month[0] !== "string" || !Array.isArray(month[1])) throw new Error("month");
     const entries: Entry[] = month[1].map((entry: unknown) => {
-      if (!Array.isArray(entry) || typeof entry[0] !== "string" || !Array.isArray(entry[1])) throw new Error("entry");
-      const offers: Offer[] = entry[1].map((offer: unknown) => {
+      if (!Array.isArray(entry) || typeof entry[0] !== "string") throw new Error("entry");
+      const noted = typeof entry[1] === "string";
+      const note = noted ? entry[1] : "";
+      const offerRows = noted ? entry[2] : entry[1];
+      if (typeof note !== "string" || !Array.isArray(offerRows)) throw new Error("entry");
+      const offers: Offer[] = offerRows.map((offer: unknown) => {
         if (!Array.isArray(offer)) throw new Error("offer");
         const region = LETTER[String(offer[0])];
         if (!region) throw new Error("region");
@@ -113,7 +118,7 @@ export function decodeArchive(raw: unknown): Archive {
           ids,
         };
       });
-      return { name: entry[0], offers };
+      return { name: entry[0], note, offers };
     });
     return { ym: month[0], entries };
   });
@@ -157,14 +162,14 @@ export function filterArchive(archive: Archive, filters: ViewFilters): Month[] {
     if (filters.year !== "all" && !month.ym.startsWith(`${filters.year}-`)) continue;
     const entries: Entry[] = [];
     for (const entry of month.entries) {
-      const name = norm(entry.name);
+      const name = norm(`${entry.name} ${entry.note}`);
       if (tokens.length && !tokens.every((token) => name.includes(token))) continue;
       const offers = entry.offers.filter((offer) => {
         if (filters.region !== "all" && offer.region !== filters.region) return false;
         if (filters.platform !== "all" && !offer.platforms.includes(filters.platform)) return false;
         return true;
       });
-      if (offers.length) entries.push({ name: entry.name, offers });
+      if (offers.length) entries.push({ name: entry.name, note: entry.note, offers });
     }
     if (entries.length) months.push({ ym: month.ym, entries });
   }

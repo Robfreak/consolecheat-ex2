@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildNameIndex, canonicalName, gamesOf, matchIds, matchKey, parseDate, parseSoftwareTable, repairDates } from "./build-archive.mjs";
+import { buildNameIndex, canonicalName, gamesOf, matchIds, matchKey, parseDate, parseSoftwareTable, peelNote, repairDates, splitGluedTitles } from "./build-archive.mjs";
 
 test("parseDate reads the wiki date templates", () => {
   assert.equal(parseDate("{{dts|2014-01-07}}"), "2014-01-07");
@@ -55,6 +55,7 @@ test("parseSoftwareTable keeps PS4 and PS5 rows and the blog URL", () => {
   assert.equal(rows.length, 4);
   assert.deepEqual(rows[0], {
     name: "Need For Speed Unbound",
+    note: "",
     alts: [],
     ps4: false,
     ps5: true,
@@ -93,8 +94,10 @@ test("parseSoftwareTable keeps PS4 and PS5 rows and the blog URL", () => {
 | <ref>https://blog.playstation.com/beyond/</ref>
 |}`);
   assert.equal(messy[0].name, "Erica");
-  assert.equal(messy[1].name, "Beyond: Two Souls (Middle East)");
-  assert.deepEqual(messy[1].alts, ["Beyond: Two Souls"]);
+  assert.equal(messy[0].note, "");
+  assert.equal(messy[1].name, "Beyond: Two Souls");
+  assert.equal(messy[1].note, "Middle East");
+  assert.deepEqual(messy[1].alts, []);
   const sorted = parseSoftwareTable(`
 {| class="wikitable" id="softwarelist"
 ! Game
@@ -112,8 +115,10 @@ test("parseSoftwareTable keeps PS4 and PS5 rows and the blog URL", () => {
 | {{dts|2021|04|06}}
 | <ref>https://blog.zh-hant.playstation.com/example/</ref>
 |}`);
-  assert.equal(sorted[0].name, "The Five Covens (Spain and Portugal)");
-  assert.equal(sorted[1].name, "X-Morph: Defense (Singapore and Thailand Only)");
+  assert.equal(sorted[0].name, "The Five Covens");
+  assert.equal(sorted[0].note, "Spain and Portugal");
+  assert.equal(sorted[1].name, "X-Morph: Defense");
+  assert.equal(sorted[1].note, "Singapore and Thailand Only");
   assert.equal(rows[3].ps4, true);
   assert.equal(rows[3].added, "2021-09-07");
   assert.equal(rows[3].ref, "https://blog.zh-hant.playstation.com/2021/09/02/example/");
@@ -127,6 +132,7 @@ test("matchIds accepts one exact name and ignores near misses", () => {
       ["F1 23", ["EA Sports F1 23"], [["CUSA12345", "EU", "4"], ["PPSA12345", "EU", "5"], ["CUSA99999", "US", "4"]]],
       ["Bound", null, [["CUSA11111", "US", "4"]]],
       ["Bound", null, [["CUSA22222", "EU", "4"]]],
+      ["Beyond: Two Souls", null, [["CUSA00267", "EU", "4"]]],
     ],
   });
   assert.deepEqual(matchIds(index, ["God of War"], "US", ["PS4"]), ["CUSA07408"]);
@@ -136,6 +142,7 @@ test("matchIds accepts one exact name and ignores near misses", () => {
   assert.deepEqual(matchIds(index, ["EA Sports F1 23"], "EU", ["PS5"]), ["PPSA12345"]);
   assert.deepEqual(matchIds(index, ["God of War 2"], "US", ["PS4"]), []);
   assert.deepEqual(matchIds(index, ["Bound"], "US", ["PS4"]), []);
+  assert.deepEqual(matchIds(index, ["Beyond: Two Souls (Middle East)"], "EU", ["PS4"]), ["CUSA00267"]);
 });
 
 test("repairDates rolls a December removal into the next January and leaves real spans", () => {
@@ -147,6 +154,37 @@ test("repairDates rolls a December removal into the next January and leaves real
   assert.equal(repairDates("2025-12-02", "2026-01-06").correction, null);
   assert.equal(repairDates("2021-06-01", "2021-08-02").removed, "2021-08-02");
   assert.equal(repairDates("2018-08-07", "2018-11-06").correction, null);
+});
+
+test("glued Asia titles split, and availability suffixes become notes", () => {
+  assert.deepEqual(splitGluedTitles("[[Biped]]（Taiwan）[[Shio]]（Hong Kong）"), [
+    { name: "Biped", note: "Taiwan" },
+    { name: "Shio", note: "Hong Kong" },
+  ]);
+  assert.equal(splitGluedTitles("[[Control Ultimate Edition]](CH,ENG)"), null);
+  assert.deepEqual(peelNote("Destiny 2: Beyond Light (DLC only)"), { name: "Destiny 2: Beyond Light", note: "DLC only" });
+  assert.deepEqual(peelNote("God of War (2018)"), { name: "God of War (2018)", note: "" });
+  const split = parseSoftwareTable(`
+{| class="wikitable" id="softwarelist"
+! Game
+! [[PlayStation 4|PS4]]
+! Date added
+! Date removed
+! Ref.
+|-
+| [[Biped]]（Taiwan）[[Shio]]（Hong Kong）
+| {{yes|PS4}}
+| {{dts|2021|02|02}}
+| {{dts|2021|03|01}}
+| <ref>https://blog.zh-hant.playstation.com/2021/01/28/20210128-psplus/</ref>
+|}`);
+  assert.equal(split.length, 2);
+  assert.equal(split[0].name, "Biped");
+  assert.equal(split[0].note, "Taiwan");
+  assert.equal(split[1].name, "Shio");
+  assert.equal(split[1].note, "Hong Kong");
+  assert.equal(split[0].added, "2021-02-02");
+  assert.equal(split[1].ref, "https://blog.zh-hant.playstation.com/2021/01/28/20210128-psplus/");
 });
 
 test("canonical names drop marks, years, and the Challanger typo", () => {
