@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildNameIndex, gamesOf, matchIds, parseDate, parseSoftwareTable } from "./build-archive.mjs";
+import { buildNameIndex, canonicalName, gamesOf, matchIds, matchKey, parseDate, parseSoftwareTable, repairDates } from "./build-archive.mjs";
 
 test("parseDate reads the wiki date templates", () => {
   assert.equal(parseDate("{{dts|2014-01-07}}"), "2014-01-07");
@@ -136,6 +136,47 @@ test("matchIds accepts one exact name and ignores near misses", () => {
   assert.deepEqual(matchIds(index, ["EA Sports F1 23"], "EU", ["PS5"]), ["PPSA12345"]);
   assert.deepEqual(matchIds(index, ["God of War 2"], "US", ["PS4"]), []);
   assert.deepEqual(matchIds(index, ["Bound"], "US", ["PS4"]), []);
+});
+
+test("repairDates rolls a December removal into the next January and leaves real spans", () => {
+  assert.deepEqual(repairDates("2025-12-02", "2025-01-05"), {
+    added: "2025-12-02",
+    removed: "2026-01-05",
+    correction: "2025-01-05 → 2026-01-05",
+  });
+  assert.equal(repairDates("2025-12-02", "2026-01-06").correction, null);
+  assert.equal(repairDates("2021-06-01", "2021-08-02").removed, "2021-08-02");
+  assert.equal(repairDates("2018-08-07", "2018-11-06").correction, null);
+});
+
+test("canonical names drop marks, years, and the Challanger typo", () => {
+  assert.equal(canonicalName("Titanfall™ 2"), "Titanfall 2");
+  assert.equal(canonicalName("EA Sports F1 25"), "EA Sports F1 25");
+  assert.equal(matchKey("EA Sports F1 25"), "f1 25");
+  assert.equal(canonicalName("Hitman 2 (2018)"), "Hitman 2");
+  assert.equal(canonicalName("God of War (2018)"), "God of War");
+  assert.equal(canonicalName("Godfall: Challanger Edition"), "Godfall: Challenger Edition");
+  assert.equal(canonicalName("Twogether: Project Indigos (Spain and Portugal)"), "Twogether: Project Indigos (Spain and Portugal)");
+});
+
+test("several releases of one name get no title ID", () => {
+  const index = buildNameIndex({
+    titles: [
+      ["Call of Duty Modern Warfare 2", null, [["CUSA53708", "Asia", "4"], ["CUSA53705", "US", "4"]]],
+      ["Call of Duty: Modern Warfare 2 Campaign Remastered", null, [["CUSA11012", "Asia", "4"], ["CUSA09249", "US", "4"]]],
+      ["God of War", null, [["CUSA07408", "US", "4"], ["CUSA07410", "EU", "4"]]],
+      ["God of War III Remastered", null, [["CUSA01623", "US", "4"]]],
+      ["Godfall", null, [["CUSA26921", "US", "4"]]],
+      ["Godfall: Challenger Edition", null, [["CUSA31058", "US", "4"], ["CUSA31059", "EU", "4"]]],
+      ["Fall Guys: Ultimate Knockout", null, [["CUSA17711", "US", "4"]]],
+      ["Fall Guys: Ultimate Knockout", null, [["CUSA29236", "US", "4"]]],
+    ],
+  });
+  assert.deepEqual(matchIds(index, ["Call of Duty: Modern Warfare 2"], "Asia", ["PS4"]), []);
+  assert.deepEqual(matchIds(index, ["Call of Duty: Modern Warfare 2 Campaign Remastered"], "US", ["PS4"]), ["CUSA09249"]);
+  assert.deepEqual(matchIds(index, ["God of War (2018)"], "US", ["PS4"]), ["CUSA07408"]);
+  assert.deepEqual(matchIds(index, ["Godfall: Challanger Edition", "Godfall"], "US", ["PS4"]), ["CUSA31058"]);
+  assert.deepEqual(matchIds(index, ["Fall Guys: Ultimate Knockout"], "US", ["PS4"]), []);
 });
 
 test("gamesOf reads the compact Title-ID-Finder format", () => {

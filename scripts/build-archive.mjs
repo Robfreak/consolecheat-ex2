@@ -59,8 +59,30 @@ export function wikiUrl(title) {
   return `https://playstation.fandom.com/wiki/${encodeURIComponent(title.replace(/ /g, "_"))}`;
 }
 
+const EDITION_WORDS = new Set(
+  "remaster remastered remake campaign edition definitive deluxe gold goty hd enhanced collection anniversary complete ultimate director directors cut".split(" "),
+);
+
 export function norm(input) {
-  return input
+  return matchKey(input);
+}
+
+/** Visible title: drop marks, a trailing (year), a leading “EA Sports”, and the Challanger typo. */
+export function canonicalName(input) {
+  let text = String(input)
+    .replace(/[™®©℠]/g, "")
+    .normalize("NFKD")
+    .replace(/\p{M}+/gu, "")
+    .replace(/\uFF1A/g, ":")
+    .replace(/[’‘`´]/g, "'");
+  text = text.replace(/challanger/gi, "Challenger");
+  text = text.replace(/\s*\(((?:19|20)\d{2})\)\s*$/g, "");
+  text = text.replace(/:(?=\S)/g, ": ");
+  return text.replace(/\s+/g, " ").trim();
+}
+
+function legacyKey(input) {
+  return String(input)
     .normalize("NFKD")
     .replace(/\p{M}+/gu, "")
     .replace(/[™®©]/g, "")
@@ -70,6 +92,57 @@ export function norm(input) {
     .replace(/[^\p{L}\p{N}]+/gu, " ")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+function bareKey(input) {
+  return String(input)
+    .replace(/[™®©℠]/g, "")
+    .normalize("NFKD")
+    .replace(/\p{M}+/gu, "")
+    .replace(/[’‘`´]/g, "'")
+    .replace(/&/g, " and ")
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/** Match key. Also drops a leading “EA Sports”, which the catalog sometimes omits. */
+export function matchKey(input) {
+  return bareKey(canonicalName(input).replace(/^(?:EA Sports)\s+/i, ""));
+}
+
+function daySpan(start, end) {
+  if (!start || !end || start.length < 10 || end.length < 10) return null;
+  return Math.round((Date.parse(end) - Date.parse(start)) / 86400000);
+}
+
+function shiftYear(iso, years) {
+  const [year, month, day] = iso.split("-").map(Number);
+  const next = new Date(Date.UTC(year + years, month - 1, day));
+  if (next.getUTCFullYear() !== year + years || next.getUTCMonth() !== month - 1 || next.getUTCDate() !== day) return null;
+  return `${next.getUTCFullYear()}-${pad(month)}-${pad(day)}`;
+}
+
+/**
+ * A monthly game is added in its month and removed early the next month.
+ * The known wiki typo writes that January end with the old year
+ * (“January 5, 2025” on the December 2025 list). Only that one-year
+ * rollover is rewritten, and only when the corrected end sits a few weeks
+ * after the start. Other spans are left as the wiki printed them.
+ */
+export function repairDates(added, removed) {
+  if (!added || !removed) return { added: added ?? "", removed: removed ?? "", correction: null };
+  const span = daySpan(added, removed);
+  if (span == null || (span > 0 && span <= 75)) return { added, removed, correction: null };
+  if (span <= 0) {
+    const bumped = shiftYear(removed, 1);
+    const next = bumped ? daySpan(added, bumped) : null;
+    if (bumped && next != null && next > 0 && next <= 45) {
+      return { added, removed: bumped, correction: `${removed} → ${bumped}` };
+    }
+  }
+  return { added, removed, correction: null };
 }
 
 function pad(value) {
@@ -394,7 +467,7 @@ export function parseSoftwareTable(wikitext) {
     if (!name || /^\d+$/.test(name)) continue;
     rows.push({
       name,
-      alts: alts.map((alt) => cleanName(alt)).filter((alt) => norm(alt) && norm(alt) !== norm(name)),
+      alts: alts.map((alt) => cleanName(alt)).filter((alt) => bareKey(alt) && bareKey(alt) !== bareKey(name)),
       ps4: ps4Col >= 0 && isYes(cells[ps4Col] ?? ""),
       ps5: ps5Col >= 0 && isYes(cells[ps5Col] ?? ""),
       vr: vrCol >= 0 && isYes(cells[vrCol] ?? ""),
@@ -568,6 +641,12 @@ export function gamesOf(titlesFile) {
   return names.map((name, gi) => [name, titlesFile.aliases?.[String(gi)] ?? null, grouped[gi]]);
 }
 
+function editionSibling(shorter, longer) {
+  if (!longer.startsWith(`${shorter} `)) return false;
+  const rest = longer.slice(shorter.length + 1).split(" ");
+  return rest.length > 0 && rest.every((word) => EDITION_WORDS.has(word));
+}
+
 export function buildNameIndex(titlesFile) {
   const map = new Map();
   const ambiguous = Symbol("ambiguous");
@@ -577,22 +656,22 @@ export function buildNameIndex(titlesFile) {
     if (!prev) map.set(key, game);
     else if (prev !== game && prev !== ambiguous) map.set(key, ambiguous);
   };
+  const primaryKeys = [];
   for (const game of gamesOf(titlesFile)) {
-    add(norm(game[0]), game);
-    for (const alias of game[1] ?? []) add(norm(alias), game);
+    const key = bareKey(game[0]);
+    add(key, game);
+    if (key) primaryKeys.push(key);
+    for (const alias of game[1] ?? []) add(bareKey(alias), game);
   }
-  return { map, ambiguous };
+  const editionAmbiguous = new Set();
+  const uniqueKeys = [...new Set(primaryKeys)];
+  for (const key of uniqueKeys) {
+    if (uniqueKeys.some((other) => editionSibling(key, other))) editionAmbiguous.add(key);
+  }
+  return { map, ambiguous, editionAmbiguous };
 }
 
-export function matchIds(index, names, region, platforms) {
-  let game = null;
-  for (const name of names) {
-    const hit = index.map.get(norm(name));
-    if (!hit || hit === index.ambiguous) continue;
-    game = hit;
-    break;
-  }
-  if (!game) return [];
+function idsFor(game, region, platforms) {
   const want = new Set(platforms);
   const ids = [];
   for (const sku of game[2]) {
@@ -605,6 +684,42 @@ export function matchIds(index, names, region, platforms) {
   }
   ids.sort();
   return ids;
+}
+
+function lookupName(index, name) {
+  const strict = bareKey(name);
+  const loose = matchKey(name);
+  const keys = [];
+  if (strict) keys.push(strict);
+  if (loose && loose !== strict) keys.push(loose);
+  for (const key of keys) {
+    // A base title plus “Remastered”, “Campaign Remastered”, or another edition
+    // is more than one release. Two catalog rows that share a name are too.
+    // Don't try a shorter key after that.
+    if (index.editionAmbiguous.has(key)) return index.ambiguous;
+    const hit = index.map.get(key);
+    if (hit === index.ambiguous) return index.ambiguous;
+    if (hit) return hit;
+  }
+  return null;
+}
+
+export function matchIds(index, names, region, platforms) {
+  const hits = [];
+  for (const name of names) {
+    const hit = lookupName(index, name);
+    if (hit && hit !== index.ambiguous && !hits.includes(hit)) hits.push(hit);
+  }
+  if (hits.length > 1) {
+    const specific = hits.filter((hit) => {
+      const key = bareKey(hit[0]);
+      return !hits.some((other) => other !== hit && bareKey(other[0]).startsWith(`${key} `));
+    });
+    if (specific.length === 1) return idsFor(specific[0], region, platforms);
+    return [];
+  }
+  if (hits.length === 1) return idsFor(hits[0], region, platforms);
+  return [];
 }
 
 function platformsCode(ps4, ps5) {
@@ -657,6 +772,8 @@ async function main() {
   const omitted = { vrOnly: 0, otherPlatform: 0, noDate: 0 };
   const byMonth = new Map();
   const pageUrls = [];
+  const dateCorrections = [];
+  let deduped = 0;
 
   for (const page of chosen) {
     const text = await fetchWikitext(page.title);
@@ -670,10 +787,17 @@ async function main() {
         else omitted.otherPlatform += 1;
         continue;
       }
+      const display = canonicalName(row.name);
       const ym = monthKey(row.added);
-      if (!ym) {
+      if (!display || !ym) {
         omitted.noDate += 1;
         continue;
+      }
+      const repaired = repairDates(row.added, row.removed ?? "");
+      if (repaired.correction) {
+        dateCorrections.push(`${page.region} ${ym} ${display}: removed ${repaired.correction}`);
+      } else if (row.removed && row.added && row.removed < row.added) {
+        warnings.push(`${page.region} ${ym} ${display}: removed ${row.removed} is before added ${row.added}; left unchanged.`);
       }
       kept += 1;
       let month = byMonth.get(ym);
@@ -681,27 +805,39 @@ async function main() {
         month = new Map();
         byMonth.set(ym, month);
       }
-      const key = norm(row.name);
+      const key = matchKey(display);
       let entry = month.get(key);
       if (!entry) {
-        entry = { name: row.name, alts: new Set(row.alts), offers: [] };
+        entry = { name: display, raws: new Set([row.name]), legacy: legacyKey(row.name), alts: new Set(row.alts), offers: [] };
         month.set(key, entry);
-      } else if (nameMess(row.name) < nameMess(entry.name) || (nameMess(row.name) === nameMess(entry.name) && row.name.length > entry.name.length)) {
-        entry.name = row.name;
+      } else {
+        const incoming = legacyKey(row.name);
+        if (incoming !== entry.legacy) {
+          deduped += 1;
+          console.log(`Dedupe ${page.region} ${ym}: “${row.name}” → “${entry.name}”`);
+        }
+        const lower = (value) => (value.match(/\p{Ll}/gu) ?? []).length;
+        if (lower(display) > lower(entry.name)) entry.name = display;
+        const stripPublisher = (value) => value.replace(/^(?:EA Sports)\s+/i, "");
+        if (stripPublisher(entry.name) === stripPublisher(display) && stripPublisher(entry.name) !== entry.name) {
+          entry.name = stripPublisher(entry.name);
+        }
       }
+      entry.raws.add(row.name);
       for (const alt of row.alts) entry.alts.add(alt);
       const platforms = [...(row.ps4 ? ["PS4"] : []), ...(row.ps5 ? ["PS5"] : [])];
-      const existing = entry.offers.find((offer) => offer.region === page.region && offer.added === row.added);
+      const existing = entry.offers.find((offer) => offer.region === page.region);
       if (existing) {
         for (const platform of platforms) if (!existing.platforms.includes(platform)) existing.platforms.push(platform);
         if (!existing.ref && row.ref) existing.ref = row.ref;
-        if (!existing.removed && row.removed) existing.removed = row.removed;
+        if (repaired.removed && (!existing.removed || existing.removed < existing.added)) existing.removed = repaired.removed;
+        if (row.added && row.added < existing.added) existing.added = row.added;
       } else {
         entry.offers.push({
           region: page.region,
           platforms,
           added: row.added,
-          removed: row.removed ?? "",
+          removed: repaired.removed,
           ref: row.ref,
           page: pageUrl,
           ids: [],
@@ -724,7 +860,7 @@ async function main() {
       entries += 1;
       let matched = false;
       for (const offer of entry.offers) {
-        offer.ids = matchIds(index, [entry.name, ...entry.alts], offer.region, offer.platforms);
+        offer.ids = matchIds(index, [...entry.raws, entry.name, ...entry.alts], offer.region, offer.platforms);
         if (offer.ids.length) matched = true;
       }
       if (matched) withIds += 1;
@@ -804,6 +940,8 @@ async function main() {
       entries,
       withIds,
       urls: 0,
+      dateCorrections: dateCorrections.length,
+      deduped,
     },
     coverage,
     omitted,
@@ -844,6 +982,26 @@ async function main() {
   ];
   for (const check of checks) mustFind(readable, check);
 
+  const december = readable.months.find((month) => month.ym === "2025-12");
+  const neon = december?.entries.find((entry) => norm(entry.name).includes("neon white"));
+  const neonUs = neon?.offers.find((offer) => offer.region === "U");
+  if (neonUs?.removed !== "2026-01-05") {
+    throw new Error(`December 2025 North America should end 2026-01-05, got ${neonUs?.removed ?? "missing"}.`);
+  }
+  const july = readable.months.find((month) => month.ym === "2020-07");
+  const mw2 = july?.entries.find((entry) => entry.name.includes("Modern Warfare 2") && !entry.name.includes("Remaster"));
+  const mw2Asia = mw2?.offers.find((offer) => offer.region === "A");
+  if (!mw2Asia) throw new Error("Asia July 2020 Modern Warfare 2 is missing.");
+  if (mw2Asia.ids.length) {
+    throw new Error(`Asia July 2020 Modern Warfare 2 must have no title ID, got ${mw2Asia.ids.join(",")}.`);
+  }
+  const june = readable.months.find((month) => month.ym === "2022-06");
+  const gow = june?.entries.find((entry) => norm(entry.name) === "god of war");
+  const gowUs = gow?.offers.find((offer) => offer.region === "U");
+  if (!gowUs?.ids.includes("CUSA07408")) {
+    throw new Error(`God of War (2018) US should match CUSA07408, got ${gowUs?.ids.join(",") || "none"}.`);
+  }
+
   archive.stats.urls = urls.length;
   const { writeFile, mkdir } = await import("node:fs/promises");
   await mkdir(new URL("../public/", import.meta.url), { recursive: true });
@@ -853,6 +1011,9 @@ async function main() {
   console.log(
     `Wrote ${target.pathname}  ${bytes} bytes  ${months.length} months  ${entries} entries  ${withIds} with title IDs`,
   );
+  console.log(`Date corrections ${dateCorrections.length}`);
+  for (const line of dateCorrections) console.log(`  ${line}`);
+  console.log(`Deduped rows ${deduped}`);
   console.log("Coverage", JSON.stringify(coverage));
   console.log("Omitted", JSON.stringify(omitted));
   if (warnings.length) console.log("Warnings", warnings.join(" | "));

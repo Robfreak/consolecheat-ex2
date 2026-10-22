@@ -95,7 +95,7 @@ export const copy: Record<Lang, Copy> = {
   de: pack({
     mailTitle: "Webmail auf consolecheat.com",
     eyebrow: "PSN-Werkzeug · im Browser",
-    lede: "Die monatlichen Spiele von PlayStation Plus Essential, und davor die monatlichen PS-Plus-Spiele. Neueste Monate zuerst. Jede Zeile stammt aus der PlayStation Wiki, mit dem Blog-Link, den die Zeile angibt.",
+    lede: "Die monatlichen Spiele von PlayStation Plus Essential, und davor die monatlichen PS-Plus-Spiele. Neueste Monate zuerst. Jede Zeile stammt aus dem PlayStation Wiki, mit dem Blog-Link, den die Zeile angibt.",
     freeClaim: "Komplett kostenlos. Auf dieser Seite kostet nichts Geld.",
     privacyClaim: "Keine Anmeldung. Die Liste bleibt in diesem Tab und wird nicht gespeichert.",
     unofficial: "Inoffiziell. Nicht von Sony.",

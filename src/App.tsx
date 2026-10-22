@@ -362,9 +362,16 @@ export function App() {
           {archive ? (
             <p>
               <a href={archive.list} className="text-steel underline-offset-4 hover:underline">
-                {t.source}
+                PlayStation Wiki (Fandom)
               </a>
-              {archive.license ? ` · ${archive.license}` : ""}
+              {", Autoren · "}
+              <a
+                href="https://creativecommons.org/licenses/by-sa/4.0/"
+                className="text-steel underline-offset-4 hover:underline"
+              >
+                {archive.license || "CC BY-SA 4.0"}
+              </a>
+              {" · bearbeitet"}
               {archive.generated ? ` · ${archive.generated}` : ""}
             </p>
           ) : null}

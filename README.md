@@ -25,7 +25,11 @@ Pages the script asks for:
 
 A year page from 2014 through the current year must exist and must contain at least one PS4 or PS5 row, or the script stops. It does not invent a month to fill a hole.
 
-Title IDs come from the Title-ID-Finder file `public/titles.json` at commit `d8264e5adf8e3806c6868623ca5a6aa1829d28a1` of `cursor/title-id-finder-0ef2` (compact format 2). That file is built from andshrew/PlayStation-Titles. A name matches only when the normalized wiki name, or the wiki’s own link target, is exactly one game in that file. The ID’s region and platform have to be the ones on the monthly row. Unknown-region IDs are not copied.
+Title IDs come from the Title-ID-Finder file `public/titles.json` at commit `d8264e5adf8e3806c6868623ca5a6aa1829d28a1` of `cursor/title-id-finder-0ef2` (compact format 2). That file is built from andshrew/PlayStation-Titles. Before the comparison the script strips ™/®, a leading “EA Sports”, a trailing `(year)`, and the typo Challanger → Challenger. A name matches only when that key is exactly one game. If the dataset has several releases of that name (the base title and a remaster, campaign, or other edition, or two records with the same name), the row gets no ID. The ID’s region and platform still have to be the ones on the monthly row. Unknown-region IDs are not copied.
+
+A removal date that falls before the add date is moved forward one year when that lands within 45 days, which is the December-to-January typo (December 2025 North America was “January 5, 2025” on the wiki). Every correction is printed by the script. Longer spans the wiki actually printed, including the June 2026 PAL rows, are left as they are.
+
+The same normalized key merges duplicate rows inside one month, so “Titanfall™ 2” and “Titanfall 2”, or “F1 25” and “EA Sports F1 25”, become one game.
 
 ```bash
 npm run data     # refresh public/archive.json
@@ -69,7 +73,9 @@ A regional note such as “(Spain and Portugal)” is part of the wiki row and s
 
 ## Footer
 
-The footer matches the Title-ID-Finder at `d8264e5`: the name, then Impressum and Datenschutz, the free line, the privacy line, the “not Sony” line, and the source. Those two links are `#impressum` and `#datenschutz` on this site, the same hash pages that project uses. The Impressum is the same placeholder text. No name, address, or contact is filled in. The privacy page describes this archive (static files, no cookies, self-hosted fonts, the wiki list) and points at the same GitHub privacy statement.
+The footer matches the Title-ID-Finder at `d8264e5`: the name, then Impressum and Datenschutz, the free line, the privacy line, and the “not Sony” line. Those two links are `#impressum` and `#datenschutz` on this site, the same hash pages that project uses. The Impressum is the same placeholder text. No name, address, or contact is filled in. The privacy page describes this archive (static files, no cookies, self-hosted fonts, the wiki list) and points at the same GitHub privacy statement.
+
+The source line is the CC BY-SA attribution: “PlayStation Wiki (Fandom), Autoren”, a link to the [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/) license, and “bearbeitet”.
 
 ## GitHub Pages
 
