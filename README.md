@@ -69,13 +69,13 @@ Not in the source, so not in the archive:
 - PAL has no PS4/PS5 row for December 2013 or May 2014.
 - PAL July 2026 is empty as a month because the wiki dates Call of Duty: Modern Warfare III, For the King II, and CrossCode to 2 June 2026 (removed 3 August 2026). The citation on those rows is the July announcement (`…de-julio-…`). The archive keeps the date printed in the table.
 
-A regional or availability suffix such as “(Spain and Portugal)”, “(Middle East)”, or “(DLC only)” is stored in `note` and shown under the title. It is not a separate region filter. Asia’s February 2021 cell `[[Biped]]（Taiwan）[[Shio]]（Hong Kong）` is two games: Biped (Taiwan) and Shio (Hong Kong).
+A regional or availability suffix such as “(Spain and Portugal)”, “(Middle East)”, or “(DLC only)” is stored in `note` in English and shown under the title in the active language. An unknown note stays in the original wording. It is not a separate region filter. Asia’s February 2021 cell `[[Biped]]（Taiwan）[[Shio]]（Hong Kong）` is two games: Biped (Taiwan) and Shio (Hong Kong).
 
 ## Footer
 
 The footer matches the Title-ID-Finder at `d8264e5`: the name, then Impressum and Datenschutz, the free line, the privacy line, and the “not Sony” line. Those two links are `#impressum` and `#datenschutz` on this site, the same hash pages that project uses. The Impressum is the same placeholder text. No name, address, or contact is filled in. The privacy page describes this archive (static files, no cookies, self-hosted fonts, the wiki list) and points at the same GitHub privacy statement.
 
-The source line is “Daten aus dem PlayStation Wiki (Fandom), CC BY-SA 4.0, bearbeitet”, with [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/) linked. Fonts are the fontsource files with the `.woff` fallback removed, same as the Title-ID-Finder, so the build ships only `.woff2`.
+The source line follows the UI language. In German it stays “Daten aus dem PlayStation Wiki (Fandom), CC BY-SA 4.0, bearbeitet”, with [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/) linked. The result count uses the language’s plural (“1 game”, “2 games”). Fonts are the fontsource files with the `.woff` fallback removed, same as the Title-ID-Finder, so the build ships only `.woff2`.
 
 ## GitHub Pages
 

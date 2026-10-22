@@ -13,7 +13,8 @@ import {
 } from "./archive";
 import { MailIcon, Mark, MoonIcon, SunIcon } from "./icons";
 import { LegalPage } from "./legal";
-import { RTL, copy, detectLang, fill, isLang, languageOptions, type Copy, type Lang } from "./messages";
+import { RTL, copy, detectLang, fill, isLang, languageOptions, resultCount, type Copy, type Lang } from "./messages";
+import { noteLabel } from "./notes";
 
 type Page = "home" | "impressum" | "datenschutz";
 
@@ -167,7 +168,10 @@ export function App() {
   }, []);
 
   const filters = useMemo<ViewFilters>(() => ({ query: deferred, region, platform, year }), [deferred, platform, region, year]);
-  const months = useMemo(() => (archive ? filterArchive(archive, filters) : []), [archive, filters]);
+  const months = useMemo(
+    () => (archive ? filterArchive(archive, filters, (note) => noteLabel(lang, note)) : []),
+    [archive, filters, lang],
+  );
   const years = useMemo(() => (archive ? yearsOf(archive) : []), [archive]);
   const shown = countEntries(months);
 
@@ -313,7 +317,7 @@ export function App() {
           <div className="mt-4" aria-live="polite">
             {!archive && !error ? <p className="panel rounded-xl px-5 py-8 text-muted">{t.loading}</p> : null}
             {error ? <p className="panel rounded-xl px-5 py-8 text-muted">{t.loadError}</p> : null}
-            {archive ? <p className="mb-3 text-sm text-subtle">{fill(t.results, { n: shown.toLocaleString(localeOf(lang)) })}</p> : null}
+            {archive ? <p className="mb-3 text-sm text-subtle">{resultCount(lang, shown)}</p> : null}
             {archive && shown === 0 ? <p className="panel rounded-xl px-5 py-8 text-muted">{t.empty}</p> : null}
             <div className="flex flex-col gap-8">
               {months.map((month) => (
@@ -359,20 +363,28 @@ export function App() {
           <p>{t.freeClaim}</p>
           <p>{t.privacyClaim}</p>
           <p>{t.footerNote}</p>
-          <p>
-            {"Daten aus dem "}
-            <a href="https://playstation.fandom.com/wiki/PlayStation_Plus" className="text-steel underline-offset-4 hover:underline">
-              PlayStation Wiki (Fandom)
-            </a>
-            {", "}
-            <a href="https://creativecommons.org/licenses/by-sa/4.0/" className="text-steel underline-offset-4 hover:underline">
-              CC BY-SA 4.0
-            </a>
-            {", bearbeitet"}
-          </p>
+          <SourceLine template={t.sourceLine} />
         </div>
       </footer>
     </div>
+  );
+}
+
+function SourceLine({ template }: { template: string }) {
+  const [before = "", rest = ""] = template.split("{wiki}");
+  const [middle = "", after = ""] = rest.split("{license}");
+  return (
+    <p>
+      {before}
+      <a href="https://playstation.fandom.com/wiki/PlayStation_Plus" className="text-steel underline-offset-4 hover:underline">
+        PlayStation Wiki (Fandom)
+      </a>
+      {middle}
+      <a href="https://creativecommons.org/licenses/by-sa/4.0/" className="text-steel underline-offset-4 hover:underline">
+        CC BY-SA 4.0
+      </a>
+      {after}
+    </p>
   );
 }
 
@@ -414,7 +426,7 @@ function GameCard({ name, note, offers, t, lang }: { name: string; note: string;
           <a href={open} className="font-display text-xl font-semibold tracking-tight text-fg">
             {name}
           </a>
-          {note ? <p className="mt-0.5 text-sm text-subtle">{note}</p> : null}
+          {note ? <p className="mt-0.5 text-sm text-subtle">{noteLabel(lang, note)}</p> : null}
         </div>
         <a
           href={open}
