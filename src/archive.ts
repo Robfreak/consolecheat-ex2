@@ -176,12 +176,18 @@ export function filterArchive(archive: Archive, filters: ViewFilters, noteOf: (n
   return months;
 }
 
-export function visibleIds(offers: Offer[]): string[] {
+export function visibleIds(offers: readonly Offer[]): string[] {
   const ids: string[] = [];
   for (const offer of offers) {
     for (const id of offer.ids) if (!ids.includes(id)) ids.push(id);
   }
   return ids;
+}
+
+/** Finder `?q` for a title on screen: the only title ID, otherwise the name. */
+export function titleFinderQuery(name: string, offers: readonly Offer[]): string {
+  const ids = visibleIds(offers);
+  return ids.length === 1 ? ids[0] : name;
 }
 
 export function finderHref(query: string): string {

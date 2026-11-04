@@ -4,7 +4,7 @@ import {
   decodeArchive,
   filterArchive,
   finderHref,
-  visibleIds,
+  titleFinderQuery,
   type Archive,
   type Offer,
   type Region,
@@ -15,6 +15,7 @@ import { MailIcon, Mark, MoonIcon, SunIcon } from "./icons";
 import { LegalPage } from "./legal";
 import { RTL, copy, detectLang, fill, isLang, languageOptions, resultCount, type Copy, type Lang } from "./messages";
 import { noteLabel } from "./notes";
+import { OTHER_TOOLS } from "./tools";
 
 type Page = "home" | "impressum" | "datenschutz";
 
@@ -360,6 +361,16 @@ export function App() {
               Datenschutz
             </a>
           </nav>
+          <p id="more-tools" className="text-fg">
+            {t.moreTools}
+          </p>
+          <nav className="flex flex-wrap gap-x-4 gap-y-1" aria-labelledby="more-tools">
+            {OTHER_TOOLS.map((tool) => (
+              <a key={tool.id} href={tool.href} className="text-steel underline-offset-4 hover:underline">
+                {tool.label}
+              </a>
+            ))}
+          </nav>
           <p>{t.freeClaim}</p>
           <p>{t.privacyClaim}</p>
           <p>{t.footerNote}</p>
@@ -417,8 +428,7 @@ function Coverage({ archive, t, lang }: { archive: Archive; t: Copy; lang: Lang 
 }
 
 function GameCard({ name, note, offers, t, lang }: { name: string; note: string; offers: Offer[]; t: Copy; lang: Lang }) {
-  const ids = visibleIds(offers);
-  const open = finderHref(ids.length === 1 ? ids[0] : name);
+  const open = finderHref(titleFinderQuery(name, offers));
   return (
     <li className="panel rounded-xl p-4 sm:p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
-import { countEntries, decodeArchive, filterArchive, finderHref, visibleIds } from "./archive.ts";
+import { countEntries, decodeArchive, filterArchive, finderHref, titleFinderQuery, visibleIds, type Offer } from "./archive.ts";
 
 const archive = decodeArchive(JSON.parse(readFileSync(new URL("../public/archive.json", import.meta.url), "utf8")));
 
@@ -52,6 +52,23 @@ test("filters and the Title-ID-Finder link use q, not id", () => {
   assert.equal(href.includes("id="), false);
   const nameHref = finderHref("God of War");
   assert.match(nameHref, /\?q=God(\+|%20)of(\+|%20)War$/);
+
+  const offer = (ids: string[]): Offer => ({
+    region: "US",
+    platforms: ["PS4"],
+    added: "2020-01-01",
+    removed: "",
+    ref: "",
+    page: "https://playstation.fandom.com/wiki/PlayStation_Plus",
+    ids,
+  });
+  assert.equal(titleFinderQuery("God of War", [offer(["CUSA07408"])]), "CUSA07408");
+  assert.equal(finderHref(titleFinderQuery("God of War", [offer(["CUSA07408"])])), href);
+  assert.equal(titleFinderQuery("No Id Game", [offer([])]), "No Id Game");
+  assert.equal(titleFinderQuery("Two Ids", [offer(["CUSA00001", "CUSA00002"])]), "Two Ids");
+  assert.equal(titleFinderQuery("Same Id Twice", [offer(["CUSA00001"]), offer(["CUSA00001"])]), "CUSA00001");
+  assert.match(finderHref(titleFinderQuery("No Id Game", [offer([])])), /\?q=No(\+|%20)Id(\+|%20)Game$/);
+  assert.equal(finderHref("Bloodborne").includes("id="), false);
 
   const december = archive.months.find((month) => month.ym === "2025-12");
   const neon = december?.entries.find((entry) => entry.name === "Neon White");
